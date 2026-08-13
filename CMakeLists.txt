@@ -15,6 +15,8 @@ set(CMAKE_EXE_LINKER_FLAGS_DEBUG "-fsanitize=address,undefined")
 
 add_library(storage_engine STATIC
   src/bplus_tree.cpp
+  src/disk_manager.cpp
+  src/buffer_pool.cpp
 )
 target_include_directories(storage_engine PUBLIC ${CMAKE_SOURCE_DIR}/include)
 
