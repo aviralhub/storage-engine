@@ -1,6 +1,6 @@
 # storage-engine
 
-B+Tree key-value store in C++. Work in progress.
+On-disk B+Tree key-value store in C++. 4KB pages with an LRU buffer pool. Work in progress.
 
 ## Build
 
