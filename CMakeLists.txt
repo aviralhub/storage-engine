@@ -18,6 +18,8 @@ add_library(storage_engine STATIC
   src/disk_manager.cpp
   src/buffer_pool.cpp
   src/disk_bplus_tree.cpp
+  src/crc32.cpp
+  src/wal.cpp
 )
 target_include_directories(storage_engine PUBLIC ${CMAKE_SOURCE_DIR}/include)
 

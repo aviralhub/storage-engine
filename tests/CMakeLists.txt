@@ -6,7 +6,13 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(Catch2)
 
-add_executable(unit_tests test_bplus_tree.cpp test_disk_manager.cpp test_buffer_pool.cpp test_disk_bplus_tree.cpp)
+add_executable(unit_tests
+  test_bplus_tree.cpp
+  test_disk_manager.cpp
+  test_buffer_pool.cpp
+  test_disk_bplus_tree.cpp
+  test_wal.cpp
+)
 target_link_libraries(unit_tests PRIVATE storage_engine Catch2::Catch2WithMain)
 
 list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
