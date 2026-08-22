@@ -19,3 +19,6 @@ list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
 include(CTest)
 include(Catch)
 catch_discover_tests(unit_tests)
+
+add_test(NAME crash_recovery
+         COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/crash_test.sh $<TARGET_FILE:crash_harness>)

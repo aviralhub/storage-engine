@@ -1,6 +1,9 @@
 # storage-engine
 
-On-disk B+Tree key-value store in C++. 4KB pages with an LRU buffer pool. Work in progress.
+Key-value store in C++: a B+Tree over 4KB pages with an LRU buffer pool, and a write-ahead log for
+crash recovery.
+
+Keys are `int64_t`, values are strings up to 111 bytes. It's a library, not a server.
 
 ## Build
 
@@ -12,3 +15,6 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build .
 ctest
 ```
+
+`ctest` also runs `tests/crash_test.sh`, which kills the process mid-write and checks what recovery
+brings back.

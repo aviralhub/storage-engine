@@ -1,0 +1,2 @@
+add_executable(crash_harness crash_harness.cpp)
+target_link_libraries(crash_harness PRIVATE storage_engine)
