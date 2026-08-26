@@ -27,6 +27,16 @@ void Engine::put(int64_t key, const std::string& value) {
     tree_.insert(key, value);
 }
 
+void Engine::putBatch(const std::vector<std::pair<int64_t, std::string>>& items) {
+    for (const auto& [key, value] : items) {
+        wal_.append(WalRecordType::Put, key, value, /*sync=*/false);
+    }
+    wal_.flush();
+    for (const auto& [key, value] : items) {
+        tree_.insert(key, value);
+    }
+}
+
 bool Engine::remove(int64_t key) {
     if (!tree_.get(key).has_value()) {
         return false;

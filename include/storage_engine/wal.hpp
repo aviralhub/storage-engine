@@ -23,7 +23,8 @@ public:
     WriteAheadLog(const WriteAheadLog&) = delete;
     WriteAheadLog& operator=(const WriteAheadLog&) = delete;
 
-    int64_t append(WalRecordType type, int64_t key, const std::string& value);
+    int64_t append(WalRecordType type, int64_t key, const std::string& value, bool sync = true);
+    void flush();
     void replay(const std::function<void(const WalRecord&)>& apply);
     void reset();
 

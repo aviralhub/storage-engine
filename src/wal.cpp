@@ -34,7 +34,7 @@ void WriteAheadLog::crashAfterNextAppend() {
 }
 
 // [len][lsn][type][key][vlen][value][crc]
-int64_t WriteAheadLog::append(WalRecordType type, int64_t key, const std::string& value) {
+int64_t WriteAheadLog::append(WalRecordType type, int64_t key, const std::string& value, bool sync) {
     int64_t lsn = next_lsn_++;
 
     std::string body;
@@ -66,7 +66,7 @@ int64_t WriteAheadLog::append(WalRecordType type, int64_t key, const std::string
     if (written < 0 || static_cast<std::size_t>(written) != record.size()) {
         throw std::runtime_error("WriteAheadLog: write failed");
     }
-    if (::fsync(fd_) != 0) {
+    if (sync && ::fsync(fd_) != 0) {
         throw std::runtime_error("WriteAheadLog: fsync failed");
     }
 
@@ -75,6 +75,12 @@ int64_t WriteAheadLog::append(WalRecordType type, int64_t key, const std::string
     }
 
     return lsn;
+}
+
+void WriteAheadLog::flush() {
+    if (::fsync(fd_) != 0) {
+        throw std::runtime_error("WriteAheadLog: fsync failed");
+    }
 }
 
 void WriteAheadLog::replay(const std::function<void(const WalRecord&)>& apply) {
