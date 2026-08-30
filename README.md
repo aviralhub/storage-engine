@@ -19,6 +19,26 @@ ctest
 `ctest` also runs `tests/crash_test.sh`, which kills the process mid-write and checks what recovery
 brings back.
 
+## Shell
+
+```
+$ ./build/shell/storage_shell mydata.db mydata.wal
+> SET 1 hello world
+OK
+> BEGIN
+(tx)> SET 2 second
+QUEUED
+(tx)> DEL 1
+QUEUED
+(tx)> COMMIT
+OK (2 operations committed)
+> SCAN 1 10
+2 = second
+(1 results)
+```
+
+`BEGIN`/`COMMIT` applies the queued writes together with one fsync.
+
 ## Benchmarks
 
 `./build/bench/bench_engine` on WSL2, ext4:
@@ -44,3 +64,15 @@ recovery with  10000 uncheckpointed WAL records:    27.62 ms
 
 Batching 100 writes behind one fsync is about 90x faster than an fsync per write, but a crash loses
 the whole batch.
+
+## Layout
+
+```
+include/storage_engine/   headers
+src/                      implementation
+tests/                    Catch2 tests, crash_test.sh
+tools/crash_harness.cpp   the process crash_test.sh kills
+bench/                    benchmarks
+shell/                    REPL
+docs/design-decisions.md  notes on the trade-offs
+```

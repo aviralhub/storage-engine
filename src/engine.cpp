@@ -37,6 +37,20 @@ void Engine::putBatch(const std::vector<std::pair<int64_t, std::string>>& items)
     }
 }
 
+void Engine::applyBatch(const std::vector<BatchOp>& ops) {
+    for (const auto& op : ops) {
+        wal_.append(op.type, op.key, op.value, /*sync=*/false);
+    }
+    wal_.flush();
+    for (const auto& op : ops) {
+        if (op.type == WalRecordType::Put) {
+            tree_.insert(op.key, op.value);
+        } else {
+            tree_.remove(op.key);
+        }
+    }
+}
+
 bool Engine::remove(int64_t key) {
     if (!tree_.get(key).has_value()) {
         return false;

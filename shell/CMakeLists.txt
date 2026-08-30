@@ -1,0 +1,2 @@
+add_executable(storage_shell main.cpp)
+target_link_libraries(storage_shell PRIVATE storage_engine)

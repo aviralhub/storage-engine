@@ -20,6 +20,13 @@ public:
     void put(int64_t key, const std::string& value);
     void putBatch(const std::vector<std::pair<int64_t, std::string>>& items);
     bool remove(int64_t key);
+
+    struct BatchOp {
+        WalRecordType type;
+        int64_t key;
+        std::string value;
+    };
+    void applyBatch(const std::vector<BatchOp>& ops);
     std::optional<std::string> get(int64_t key) const;
     std::vector<std::pair<int64_t, std::string>> rangeScan(int64_t low, int64_t high) const;
 

@@ -42,6 +42,22 @@ TEST_CASE("putBatch applies every item with one shared fsync", "[engine]") {
     }
 }
 
+TEST_CASE("applyBatch commits a mix of puts and deletes together", "[engine]") {
+    auto [db, wal] = freshPaths("mixedbatch");
+    Engine engine(db, wal);
+
+    engine.put(1, "old");
+    engine.applyBatch({
+        {WalRecordType::Put, 2, "new"},
+        {WalRecordType::Delete, 1, ""},
+        {WalRecordType::Put, 3, "three"},
+    });
+
+    REQUIRE(engine.get(1) == std::nullopt);
+    REQUIRE(engine.get(2) == "new");
+    REQUIRE(engine.get(3) == "three");
+}
+
 TEST_CASE("a clean shutdown checkpoints so the next open has nothing to replay", "[engine]") {
     auto [db, wal] = freshPaths("checkpoint");
     {
