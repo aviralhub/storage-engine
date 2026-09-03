@@ -13,6 +13,7 @@ add_executable(unit_tests
   test_disk_bplus_tree.cpp
   test_wal.cpp
   test_engine.cpp
+  test_lock_manager.cpp
 )
 target_link_libraries(unit_tests PRIVATE storage_engine Catch2::Catch2WithMain)
 

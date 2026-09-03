@@ -41,3 +41,11 @@ wouldn't. This only covers the process dying, not power loss.
 The first run used `/tmp` and reported ~1.36M fsynced inserts/sec with a 0us p50. `/tmp` is tmpfs
 in WSL2 so fsync did nothing. The benchmark now uses ext4 under `/root`. `/mnt/d` goes through the
 Windows filesystem, so that's out too.
+
+## Locking
+
+Per-key S/X locks. Keys rather than pages because `Engine` only deals in keys and page ids belong to
+the tree.
+
+`grant()` used to overwrite a held lock's mode, so a txn holding X that asked for S on the same key
+got downgraded. It only upgrades now.

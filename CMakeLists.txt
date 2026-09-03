@@ -21,8 +21,11 @@ add_library(storage_engine STATIC
   src/crc32.cpp
   src/wal.cpp
   src/engine.cpp
+  src/lock_manager.cpp
 )
 target_include_directories(storage_engine PUBLIC ${CMAKE_SOURCE_DIR}/include)
+find_package(Threads REQUIRED)
+target_link_libraries(storage_engine PUBLIC Threads::Threads)
 
 enable_testing()
 add_subdirectory(tools)
