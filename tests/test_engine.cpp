@@ -1,5 +1,7 @@
 #include "storage_engine/engine.hpp"
 
+#include <thread>
+
 #include <catch2/catch_test_macros.hpp>
 
 using namespace storage_engine;
@@ -70,6 +72,62 @@ TEST_CASE("a clean shutdown checkpoints so the next open has nothing to replay",
         Engine engine(db, wal);
         REQUIRE(engine.get(1) == "a");
         REQUIRE(engine.get(2) == "b");
+    }
+}
+
+TEST_CASE("a committed transaction's writes are visible afterward", "[engine][txn]") {
+    auto [db, wal] = freshPaths("txn_commit");
+    Engine engine(db, wal);
+
+    int64_t txn = engine.beginTxn();
+    engine.txnPut(txn, 1, "a");
+    engine.txnPut(txn, 2, "b");
+    REQUIRE(engine.txnGet(txn, 1) == std::nullopt);  // no read-your-own-writes
+    engine.commitTxn(txn);
+
+    REQUIRE(engine.get(1) == "a");
+    REQUIRE(engine.get(2) == "b");
+}
+
+TEST_CASE("an aborted transaction's writes never apply", "[engine][txn]") {
+    auto [db, wal] = freshPaths("txn_abort");
+    Engine engine(db, wal);
+
+    engine.put(1, "original");
+    int64_t txn = engine.beginTxn();
+    engine.txnPut(txn, 1, "changed");
+    engine.txnPut(txn, 2, "new");
+    engine.abortTxn(txn);
+
+    REQUIRE(engine.get(1) == "original");
+    REQUIRE(engine.get(2) == std::nullopt);
+}
+
+TEST_CASE("concurrent transactions writing disjoint keys all land correctly", "[engine][txn]") {
+    auto [db, wal] = freshPaths("txn_concurrent");
+    Engine engine(db, wal);
+
+    constexpr int kThreads = 6;
+    constexpr int kOpsPerThread = 200;
+
+    std::vector<std::thread> threads;
+    for (int t = 0; t < kThreads; ++t) {
+        threads.emplace_back([&, t] {
+            for (int i = 0; i < kOpsPerThread; ++i) {
+                int64_t key = t * 100000 + i;
+                int64_t txn = engine.beginTxn();
+                engine.txnPut(txn, key, "v" + std::to_string(key));
+                engine.commitTxn(txn);
+            }
+        });
+    }
+    for (auto& th : threads) th.join();
+
+    for (int t = 0; t < kThreads; ++t) {
+        for (int i = 0; i < kOpsPerThread; ++i) {
+            int64_t key = t * 100000 + i;
+            REQUIRE(engine.get(key) == "v" + std::to_string(key));
+        }
     }
 }
 

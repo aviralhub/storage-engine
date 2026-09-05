@@ -44,8 +44,16 @@ Windows filesystem, so that's out too.
 
 ## Locking
 
-Per-key S/X locks. Keys rather than pages because `Engine` only deals in keys and page ids belong to
-the tree.
+Per-key S/X locks held until commit or abort (strict 2PL). Keys rather than pages because `Engine`
+only deals in keys and page ids belong to the tree.
+
+The tree and buffer pool aren't thread-safe, so `Engine` puts all tree access behind one mutex. The
+locks give isolation between transactions but the index itself isn't concurrent; that would need
+latch crabbing.
+
+Transactions buffer their writes and apply them with one fsync at commit, so the WAL still never
+sees anything uncommitted and redo-only still works. A transaction doesn't see its own writes
+before commit.
 
 `grant()` used to overwrite a held lock's mode, so a txn holding X that asked for S on the same key
 got downgraded. It only upgrades now.

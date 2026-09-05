@@ -38,6 +38,9 @@ void Engine::putBatch(const std::vector<std::pair<int64_t, std::string>>& items)
 }
 
 void Engine::applyBatch(const std::vector<BatchOp>& ops) {
+    if (ops.empty()) {
+        return;
+    }
     for (const auto& op : ops) {
         wal_.append(op.type, op.key, op.value, /*sync=*/false);
     }
@@ -71,6 +74,56 @@ void Engine::checkpoint() {
     pool_.flushAll();
     disk_manager_.sync();
     wal_.reset();
+}
+
+int64_t Engine::beginTxn() {
+    int64_t id = nextTxnId_.fetch_add(1);
+    std::lock_guard<std::mutex> guard(txnStateMutex_);
+    txnPending_[id] = {};
+    return id;
+}
+
+std::optional<std::string> Engine::txnGet(int64_t txn_id, int64_t key) {
+    lockManager_.lock(txn_id, key, LockMode::Shared);
+    std::lock_guard<std::mutex> guard(treeMutex_);
+    return tree_.get(key);
+}
+
+void Engine::txnPut(int64_t txn_id, int64_t key, const std::string& value) {
+    lockManager_.lock(txn_id, key, LockMode::Exclusive);
+    std::lock_guard<std::mutex> guard(txnStateMutex_);
+    txnPending_[txn_id].push_back({WalRecordType::Put, key, value});
+}
+
+void Engine::txnRemove(int64_t txn_id, int64_t key) {
+    lockManager_.lock(txn_id, key, LockMode::Exclusive);
+    std::lock_guard<std::mutex> guard(txnStateMutex_);
+    txnPending_[txn_id].push_back({WalRecordType::Delete, key, ""});
+}
+
+void Engine::commitTxn(int64_t txn_id) {
+    std::vector<BatchOp> ops;
+    {
+        std::lock_guard<std::mutex> guard(txnStateMutex_);
+        auto it = txnPending_.find(txn_id);
+        if (it != txnPending_.end()) {
+            ops = std::move(it->second);
+            txnPending_.erase(it);
+        }
+    }
+    {
+        std::lock_guard<std::mutex> guard(treeMutex_);
+        applyBatch(ops);
+    }
+    lockManager_.releaseAll(txn_id);
+}
+
+void Engine::abortTxn(int64_t txn_id) {
+    {
+        std::lock_guard<std::mutex> guard(txnStateMutex_);
+        txnPending_.erase(txn_id);
+    }
+    lockManager_.releaseAll(txn_id);
 }
 
 }  // namespace storage_engine

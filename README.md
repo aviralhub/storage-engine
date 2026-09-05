@@ -1,7 +1,7 @@
 # storage-engine
 
-Key-value store in C++: a B+Tree over 4KB pages with an LRU buffer pool, and a write-ahead log for
-crash recovery.
+Key-value store in C++: a B+Tree over 4KB pages with an LRU buffer pool, a write-ahead log for crash
+recovery, and strict 2PL transactions with deadlock detection.
 
 Keys are `int64_t`, values are strings up to 111 bytes. It's a library, not a server.
 
