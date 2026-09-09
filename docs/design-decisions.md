@@ -57,3 +57,16 @@ before commit.
 
 `grant()` used to overwrite a held lock's mode, so a txn holding X that asked for S on the same key
 got downgraded. It only upgrades now.
+
+## Deadlock detection
+
+Before blocking, `lock()` walks from the holders of the resource through whatever each of them is
+waiting on. If that reaches the requester, the requester aborts instead of waiting. The only state
+kept is which resource each blocked txn is waiting on; edges are worked out from the current holders
+every time, so nothing goes stale when a txn finishes.
+
+Always aborting the requester is simple and easy to test, but it isn't fair: the same txn can lose
+over and over.
+
+This went in after a test doing `txnGet` then `txnPut` on one key from several threads hung. Every
+thread held S and was waiting to upgrade.

@@ -9,12 +9,18 @@
 #include <atomic>
 #include <mutex>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
 namespace storage_engine {
+
+class TransactionAborted : public std::runtime_error {
+public:
+    TransactionAborted() : std::runtime_error("transaction aborted: deadlock detected") {}
+};
 
 class Engine {
 public:

@@ -131,6 +131,38 @@ TEST_CASE("concurrent transactions writing disjoint keys all land correctly", "[
     }
 }
 
+TEST_CASE("concurrent read-modify-write with deadlock retry converges to the right total",
+          "[engine][txn][deadlock]") {
+    auto [db, wal] = freshPaths("txn_retry_counter");
+    Engine engine(db, wal);
+    engine.put(100, "0");
+
+    constexpr int kThreads = 6;
+    constexpr int kIncrementsPerThread = 50;
+
+    std::vector<std::thread> threads;
+    for (int t = 0; t < kThreads; ++t) {
+        threads.emplace_back([&] {
+            for (int i = 0; i < kIncrementsPerThread; ++i) {
+                while (true) {
+                    try {
+                        int64_t txn = engine.beginTxn();
+                        auto current = engine.txnGet(txn, 100);
+                        int value = std::stoi(*current);
+                        engine.txnPut(txn, 100, std::to_string(value + 1));
+                        engine.commitTxn(txn);
+                        break;
+                    } catch (const TransactionAborted&) {
+                    }
+                }
+            }
+        });
+    }
+    for (auto& th : threads) th.join();
+
+    REQUIRE(engine.get(100) == std::to_string(kThreads * kIncrementsPerThread));
+}
+
 TEST_CASE("data survives across engine instances on the same files", "[engine]") {
     auto [db, wal] = freshPaths("persist");
     {

@@ -35,10 +35,63 @@ void LockManager::grant(int64_t resource, int64_t txn_id, LockMode mode) {
     heldByTxn_[txn_id].insert(resource);
 }
 
-void LockManager::lock(int64_t txn_id, int64_t resource, LockMode mode) {
+bool LockManager::wouldDeadlock(int64_t requester, int64_t resource) const {
+    auto seed = holders_.find(resource);
+    if (seed == holders_.end()) {
+        return false;
+    }
+
+    std::unordered_set<int64_t> visited;
+    std::vector<int64_t> stack;
+    for (const auto& h : seed->second) {
+        if (h.txn_id != requester) {
+            stack.push_back(h.txn_id);
+        }
+    }
+
+    while (!stack.empty()) {
+        int64_t current = stack.back();
+        stack.pop_back();
+        if (current == requester) {
+            return true;
+        }
+        if (!visited.insert(current).second) {
+            continue;
+        }
+
+        auto waitIt = waitingOnResource_.find(current);
+        if (waitIt == waitingOnResource_.end()) {
+            continue;
+        }
+        auto holdersIt = holders_.find(waitIt->second);
+        if (holdersIt == holders_.end()) {
+            continue;
+        }
+        for (const auto& h : holdersIt->second) {
+            stack.push_back(h.txn_id);
+        }
+    }
+    return false;
+}
+
+bool LockManager::lock(int64_t txn_id, int64_t resource, LockMode mode) {
     std::unique_lock<std::mutex> guard(mutex_);
+
+    if (compatible(resource, txn_id, mode)) {
+        grant(resource, txn_id, mode);
+        return true;
+    }
+
+    if (wouldDeadlock(txn_id, resource)) {
+        return false;
+    }
+
+    waitingOnResource_[txn_id] = resource;
     cv_.wait(guard, [&] { return compatible(resource, txn_id, mode); });
+    waitingOnResource_.erase(txn_id);
+
     grant(resource, txn_id, mode);
+    return true;
 }
 
 void LockManager::releaseAll(int64_t txn_id) {

@@ -87,6 +87,40 @@ TEST_CASE("releaseAll on an unknown transaction is a harmless no-op", "[lock_man
     lm.releaseAll(999);
 }
 
+TEST_CASE("a real circular wait is detected and exactly one side is aborted", "[lock_manager][deadlock]") {
+    LockManager lm;
+    std::atomic<int> ready{0};
+    std::atomic<bool> victim1{false};
+    std::atomic<bool> victim2{false};
+
+    std::thread t1([&] {
+        lm.lock(1, 100, LockMode::Exclusive);
+        ready++;
+        while (ready.load() < 2) {
+        }
+        if (!lm.lock(1, 200, LockMode::Exclusive)) {
+            victim1 = true;
+        }
+        lm.releaseAll(1);
+    });
+
+    std::thread t2([&] {
+        lm.lock(2, 200, LockMode::Exclusive);
+        ready++;
+        while (ready.load() < 2) {
+        }
+        if (!lm.lock(2, 100, LockMode::Exclusive)) {
+            victim2 = true;
+        }
+        lm.releaseAll(2);
+    });
+
+    t1.join();
+    t2.join();
+
+    REQUIRE(victim1.load() != victim2.load());
+}
+
 TEST_CASE("many threads incrementing the same counter under exclusive locks lose no updates",
           "[lock_manager]") {
     LockManager lm;

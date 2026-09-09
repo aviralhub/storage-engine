@@ -84,19 +84,28 @@ int64_t Engine::beginTxn() {
 }
 
 std::optional<std::string> Engine::txnGet(int64_t txn_id, int64_t key) {
-    lockManager_.lock(txn_id, key, LockMode::Shared);
+    if (!lockManager_.lock(txn_id, key, LockMode::Shared)) {
+        abortTxn(txn_id);
+        throw TransactionAborted();
+    }
     std::lock_guard<std::mutex> guard(treeMutex_);
     return tree_.get(key);
 }
 
 void Engine::txnPut(int64_t txn_id, int64_t key, const std::string& value) {
-    lockManager_.lock(txn_id, key, LockMode::Exclusive);
+    if (!lockManager_.lock(txn_id, key, LockMode::Exclusive)) {
+        abortTxn(txn_id);
+        throw TransactionAborted();
+    }
     std::lock_guard<std::mutex> guard(txnStateMutex_);
     txnPending_[txn_id].push_back({WalRecordType::Put, key, value});
 }
 
 void Engine::txnRemove(int64_t txn_id, int64_t key) {
-    lockManager_.lock(txn_id, key, LockMode::Exclusive);
+    if (!lockManager_.lock(txn_id, key, LockMode::Exclusive)) {
+        abortTxn(txn_id);
+        throw TransactionAborted();
+    }
     std::lock_guard<std::mutex> guard(txnStateMutex_);
     txnPending_[txn_id].push_back({WalRecordType::Delete, key, ""});
 }
