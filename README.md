@@ -60,10 +60,17 @@ range scan of 10000      elements:    0.785 ms total,   12731507 elements/sec
 recovery with    100 uncheckpointed WAL records:     3.18 ms
 recovery with   1000 uncheckpointed WAL records:     7.96 ms
 recovery with  10000 uncheckpointed WAL records:    27.62 ms
+
+=== Transaction throughput/abort-rate vs contention (8 threads, read-modify-write) ===
+keys=    1       203 committed ops/sec  aborts=643998 (99.6% of attempts)
+keys=   10       440 committed ops/sec  aborts= 1205 (33.4% of attempts)
+keys=  100       333 committed ops/sec  aborts=   85 (3.4% of attempts)
+keys= 1000       490 committed ops/sec  aborts=    8 (0.3% of attempts)
 ```
 
 Batching 100 writes behind one fsync is about 90x faster than an fsync per write, but a crash loses
-the whole batch.
+the whole batch. With one hot key nearly every transaction aborts and retries; see
+`docs/design-decisions.md`.
 
 ## Layout
 

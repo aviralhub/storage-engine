@@ -3,10 +3,12 @@
 #include "storage_engine/engine.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cstdio>
 #include <random>
 #include <string>
+#include <thread>
 #include <vector>
 
 using namespace storage_engine;
@@ -165,6 +167,54 @@ void benchRecoveryTime(const std::vector<int64_t>& walSizes) {
     }
 }
 
+void benchContention(int numKeys) {
+    reset(kDbPath);
+    reset(kWalPath);
+    Engine engine(kDbPath, kWalPath);
+    for (int64_t k = 0; k < numKeys; ++k) engine.put(k, "0");
+
+    constexpr int kThreads = 8;
+    constexpr int kOpsPerThread = 300;
+
+    std::atomic<int64_t> commits{0};
+    std::atomic<int64_t> aborts{0};
+
+    auto start = Clock::now();
+    std::vector<std::thread> threads;
+    for (int t = 0; t < kThreads; ++t) {
+        threads.emplace_back([&, t] {
+            std::mt19937 rng(kSeed + static_cast<uint32_t>(t));
+            std::uniform_int_distribution<int64_t> keyDist(0, numKeys - 1);
+            for (int i = 0; i < kOpsPerThread; ++i) {
+                while (true) {
+                    try {
+                        int64_t key = keyDist(rng);
+                        int64_t txn = engine.beginTxn();
+                        auto current = engine.txnGet(txn, key);
+                        int value = std::stoi(*current);
+                        engine.txnPut(txn, key, std::to_string(value + 1));
+                        engine.commitTxn(txn);
+                        commits++;
+                        break;
+                    } catch (const TransactionAborted&) {
+                        aborts++;
+                    }
+                }
+            }
+        });
+    }
+    for (auto& th : threads) th.join();
+    auto end = Clock::now();
+
+    double seconds = std::chrono::duration<double>(end - start).count();
+    int64_t totalOps = kThreads * kOpsPerThread;
+    double abortRate = 100.0 * static_cast<double>(aborts.load()) /
+                        static_cast<double>(aborts.load() + commits.load());
+
+    std::printf("keys=%5d  %8.0f committed ops/sec  aborts=%5lld (%.1f%% of attempts)\n", numKeys,
+                static_cast<double>(totalOps) / seconds, static_cast<long long>(aborts.load()), abortRate);
+}
+
 }  // namespace
 
 int main() {
@@ -192,6 +242,12 @@ int main() {
 
     std::printf("\n=== Recovery time vs uncheckpointed WAL size ===\n");
     benchRecoveryTime({100, 1000, 10000});
+
+    std::printf("\n=== Transaction throughput/abort-rate vs contention (8 threads, read-modify-write) ===\n");
+    benchContention(1);
+    benchContention(10);
+    benchContention(100);
+    benchContention(1000);
 
     return 0;
 }

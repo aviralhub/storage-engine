@@ -66,7 +66,8 @@ kept is which resource each blocked txn is waiting on; edges are worked out from
 every time, so nothing goes stale when a txn finishes.
 
 Always aborting the requester is simple and easy to test, but it isn't fair: the same txn can lose
-over and over.
+over and over. With 8 threads on a single key over 99% of attempts abort. Backoff or aborting the
+youngest txn would help.
 
 This went in after a test doing `txnGet` then `txnPut` on one key from several threads hung. Every
 thread held S and was waiting to upgrade.
